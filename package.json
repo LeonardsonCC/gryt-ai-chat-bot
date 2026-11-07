@@ -4,6 +4,6 @@
   "private": true,
   "type": "module",
   "engines": { "node": ">=22.13" },
-  "scripts": { "start": "node src/index.js", "test": "node test/conversation.test.js" },
+  "scripts": { "start": "node src/index.js", "test": "node --test" },
   "dependencies": { "@gryt/bot": "^0.3.1" }
 }

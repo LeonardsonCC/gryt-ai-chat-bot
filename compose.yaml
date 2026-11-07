@@ -16,10 +16,12 @@ services:
     environment:
       GRYT_HOST: ${GRYT_HOST:?set Gryt server host}
       GRYT_NICKNAME: ${GRYT_NICKNAME:-AI Chat}
-      CODEX_MODEL: ${CODEX_MODEL:-gpt-6-luna}
       ASSISTANT_PROVIDER: ${ASSISTANT_PROVIDER:-codex}
       ASSISTANT_MODEL: ${ASSISTANT_MODEL:-}
+      HISTORY_TTL_HOURS: ${HISTORY_TTL_HOURS:-168}
+      HISTORY_CACHE_ENABLED: ${HISTORY_CACHE_ENABLED:-false}
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:-}
       GRYT_IDENTITY_PATH: /data/ai-chat-bot-identity.json
       CODEX_HOME: /data/codex
     volumes:

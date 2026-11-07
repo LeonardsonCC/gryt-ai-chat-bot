@@ -1,4 +1,5 @@
 default_permissions = "gryt_chat"
+web_search = "live"
 
 [permissions.gryt_chat.filesystem]
 ":workspace_roots" = "read"

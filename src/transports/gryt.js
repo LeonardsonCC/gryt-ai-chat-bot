@@ -1,5 +1,6 @@
 import { EventEmitter } from 'node:events';
 import { GrytBot } from '@gryt/bot';
+import { readThreadHistory } from './thread-history.js';
 
 export class GrytTransport extends EventEmitter {
   constructor(config) {
@@ -11,6 +12,7 @@ export class GrytTransport extends EventEmitter {
     this.bot.on('ready', info => this.emit('ready', info));
   }
   start() { return this.bot.start(); }
+  readThread(message, threadId) { return readThreadHistory(this.bot, this.mention, message, threadId); }
   startThread(message, title) { return this.bot.startThread(message.conversationId, message.messageId, title); }
   send(message, threadId, text) { return this.bot.send(message.conversationId, text, { threadId }); }
   typing(message, threadId) { return this.bot.typing(message.conversationId, threadId); }
