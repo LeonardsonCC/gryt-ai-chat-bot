@@ -1,0 +1,10 @@
+default_permissions = "gryt_chat"
+
+[permissions.gryt_chat.filesystem]
+":workspace_roots" = "read"
+
+[permissions.gryt_chat.workspace_roots]
+"/tmp/gryt-codex" = true
+
+[permissions.gryt_chat.network]
+enabled = false

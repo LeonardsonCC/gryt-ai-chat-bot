@@ -1,0 +1,9 @@
+{
+  "name": "gryt-codex-bot",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "engines": { "node": ">=22.13" },
+  "scripts": { "start": "node src/index.js" },
+  "dependencies": { "@gryt/bot": "^0.3.1" }
+}
