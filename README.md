@@ -1,41 +1,176 @@
-# gryt-ai-chat-bot
+# Gryt AI Chat Bot
 
-Bot para o servidor Gryt. Ao receber `@AI Chat` em um canal, cria uma thread e responde nela. Também adota uma thread existente quando recebe uma menção nela. As respostas seguintes permanecem na mesma conversa, que é retomada após reinício.
+An AI conversation bot for Gryt with Codex, OpenAI, and OpenRouter support. Mention `@AI Chat` in a text channel to start a thread, or mention it in an existing thread to bring it into the conversation. Follow-up replies stay in that thread, and conversation context can be recovered after a restart.
 
-## Implantação
+- Choose a provider and model for new and existing conversations.
+- Rebuild context from Gryt thread history, with an optional disk cache.
+- Keep bot identity and authentication across container recreations.
+- Process messages in order within each conversation.
 
-1. Copie esta pasta para o host Gryt, por exemplo em `/opt/gryt-ai-chat-bot`.
-2. Crie `.env` com `GRYT_HOST=https://gryt.leonardson.com.br`. O nome padrão é `AI Chat`; personalize com `GRYT_NICKNAME`. O provider padrão é Codex, com `gpt-6-luna` como modelo econômico padrão. Defina `ASSISTANT_MODEL` para escolher o modelo usado na próxima resposta de qualquer conversa. Para usar OpenAI, defina `ASSISTANT_PROVIDER=openai`, opcionalmente `ASSISTANT_MODEL` (padrão `gpt-4.1-mini`) e `OPENAI_API_KEY`. Para OpenRouter, defina `ASSISTANT_PROVIDER=openrouter`, opcionalmente `ASSISTANT_MODEL` (padrão gratuito `openrouter/free`) e `OPENROUTER_API_KEY`.
-3. Execute `docker compose up -d --build`.
-4. No Gryt, abra **Server settings → Bots** e aprove `AI Chat` com `read_messages` e `send_messages`.
-5. Para Codex, conclua o login no container com `docker exec -it gryt-ai-chat-bot codex login --device-auth`. Para OpenAI, forneça `OPENAI_API_KEY`; para OpenRouter, forneça `OPENROUTER_API_KEY` no ambiente do container.
-6. Use `@AI Chat` num canal de texto para iniciar. A primeira execução pode levar alguns segundos.
+## Requirements
 
-Em instalações Docker Compose antigas, renomeie `CODEX_MODEL` para `ASSISTANT_MODEL` no `.env`. Ao executar Node diretamente, `CODEX_MODEL` continua aceito como fallback para Codex; `ASSISTANT_MODEL` tem prioridade.
+- A Gryt server where you can approve bots.
+- Docker Engine and Docker Compose.
+- A ChatGPT account for the Codex provider, or an API key for OpenAI or OpenRouter.
 
-Por padrão, `HISTORY_CACHE_ENABLED=false`: a cada nova mensagem, o bot relê a raiz e todas as respostas anteriores da thread no Gryt, com paginação, e cria uma sessão de resposta usando esse contexto. Isso também funciona sem uma nova menção em threads onde o bot já participou ou foi mencionado. Não há cache local de mensagens; as sessões Codex são efêmeras e liberadas após a resposta. A identidade e a autenticação do bot continuam no volume Docker.
+## Quick start
 
-Para reduzir as leituras do Gryt, ative o cache opcional com `HISTORY_CACHE_ENABLED=true`. O histórico fica em `/data/conversations.json`, e `HISTORY_TTL_HOURS` define seu prazo (padrão: 168 horas, ou 7 dias). O prazo começa quando a thread é carregada no cache e **não é renovado por novas respostas**. Sem cache válido, o bot relê a thread. A limpeza ocorre na inicialização e a cada minuto; registros vencidos deixam de ser usados imediatamente. Backups e registros Codex nativos antigos também são removidos conforme o TTL. Registros antigos sem expiração são descartados.
+### 1. Configure the bot
 
-Ao desativar o cache, o bot remove os arquivos locais de histórico e backups anteriores, além dos registros nativos persistentes antigos do Codex. A autenticação é preservada. Essa configuração não apaga mensagens do servidor Gryt: elas permanecem na origem e são lidas novamente para reconstruir o contexto.
+```sh
+git clone https://github.com/LeonardsonCC/gryt-ai-chat-bot.git
+cd gryt-ai-chat-bot
+cp .env.example .env
+```
 
-O histórico de texto é comum aos providers. Após recriar o container, alterações em `ASSISTANT_PROVIDER` ou `ASSISTANT_MODEL` passam a valer na próxima resposta, inclusive em threads existentes. Quando o cache está ativado, uma sessão nativa perdida é recriada usando o contexto recuperado. O Codex usa sessões efêmeras para evitar novas cópias permanentes de conversas; registros nativos antigos, ativos ou arquivados, são removidos imediatamente com o cache desativado, ou pelo TTL contado da criação quando o cache está ativo. A autenticação Codex é preservada. Resultados internos de ferramentas e raciocínio não fazem parte do histórico compartilhado.
+Edit `.env` and set your Gryt server address:
 
-O Gryt fixa o nome da identidade quando ela é aprovada. Para renomear uma identidade já aprovada, é preciso registrar e aprovar uma identidade nova em **Server settings → Bots**.
+```dotenv
+GRYT_HOST=https://gryt.example.com
+GRYT_NICKNAME=AI Chat
+ASSISTANT_PROVIDER=codex
+ASSISTANT_MODEL=gpt-6-luna
+```
 
-## Operação
+Codex is the default provider. To use an API provider instead, see [Providers](#providers).
 
-- `docker compose logs -f gryt-ai-chat-bot` acompanha a conexão e erros.
-- Reinicie com `docker compose restart gryt-ai-chat-bot`.
-- Atualizações de imagem/código: `docker compose up -d --build`.
-- Para sair da conta Codex, revogue a conexão nas configurações do ChatGPT e limpe somente a sessão em `gryt-ai-chat-bot-data:/data/codex` (isso não remove a identidade do bot).
+### 2. Create the volume and start the bot
 
-## Limites de segurança e uso
+The Compose file uses an external volume. Create it once before the first startup; existing installations can reuse the same volume.
 
-O bot pede leitura e envio de mensagens no Gryt, além da permissão opcional `upload_avatar_image` para atualizar o avatar. O provider Codex tem busca na web habilitada com `web_search = "live"` em `config.toml`, para consultar informações atuais. O acesso à rede por comandos permanece desabilitado no perfil `gryt_chat`. O provider OpenAI envia mensagens e instruções pela API Responses. O provider OpenRouter envia o histórico da conversa pela API Chat Completions. O serviço não oferece comandos para administrar o Gryt.
+```sh
+docker volume create gryt-ai-chat-bot_gryt-ai-chat-bot-data
+docker compose up -d --build
+```
 
-Com Codex, as mensagens consomem o uso da conta ChatGPT autenticada no container. OpenAI e OpenRouter usam suas respectivas chaves e limites de API. No OpenRouter, `openrouter/free` seleciona modelos gratuitos disponíveis; um modelo definido explicitamente em `ASSISTANT_MODEL` pode ter cobrança. Quem tiver acesso ao servidor pode acionar o bot. A identidade Codex e as chaves de API não devem ser incluídas em backups compartilhados ou logs.
+### 3. Approve the bot in Gryt
 
-## Desenvolvimento
+Open **Server settings → Bots** and approve `AI Chat` with `read_messages` and `send_messages`. Grant the optional `upload_avatar_image` permission if you want the bot to set its bundled avatar.
 
-Execute `npm test` para validar os fluxos de conversa sem credenciais. Providers implementam `start()`, `createSession({ model, instructions })`, `reply({ session, messages, signal })` e `stop()`; sessões são opacas pelo serviço. O adaptador Codex também limpa registros nativos antigos e libera sessões efêmeras vencidas. O CLI permanece instalado para executar essa limpeza mesmo quando outro provider estiver selecionado. O volume de autenticação Codex é exclusivo deste bot; a política de retenção também se aplica às sessões nativas nele armazenadas.
+### 4. Authenticate the provider
+
+For Codex, start the device login flow in the running container:
+
+```sh
+docker exec -it gryt-ai-chat-bot codex login --device-auth
+```
+
+Open the URL shown, enter the code, and sign in with your ChatGPT account. Check the result with:
+
+```sh
+docker exec -it gryt-ai-chat-bot codex login status
+```
+
+For OpenAI or OpenRouter, set the corresponding API key in `.env` before starting the container. The Codex login step applies only when using Codex.
+
+### 5. Start a conversation
+
+Send a message such as `@AI Chat explain how this works` in a Gryt text channel. The bot creates a thread and replies there. Continue replying in that thread without repeating the mention.
+
+You can also mention the bot in an existing thread. It reads the thread context before answering. The first response may take a few seconds.
+
+## Providers
+
+The defaults below come from this repository's configuration.
+
+| `ASSISTANT_PROVIDER` | Default model | Authentication |
+| --- | --- | --- |
+| `codex` | `gpt-6-luna` | ChatGPT login inside the container |
+| `openai` | `gpt-4.1-mini` | `OPENAI_API_KEY` |
+| `openrouter` | `openrouter/free` | `OPENROUTER_API_KEY` |
+
+Set `ASSISTANT_MODEL` to override the selected provider's default. When switching providers, also update or clear the model setting copied from `.env.example`.
+
+For example, to use OpenAI, set:
+
+```dotenv
+ASSISTANT_PROVIDER=openai
+ASSISTANT_MODEL=gpt-4.1-mini
+OPENAI_API_KEY=replace-with-your-api-key
+```
+
+For OpenRouter, set:
+
+```dotenv
+ASSISTANT_PROVIDER=openrouter
+ASSISTANT_MODEL=openrouter/free
+OPENROUTER_API_KEY=replace-with-your-api-key
+```
+
+After editing `.env`, recreate the container to apply the changes:
+
+```sh
+docker compose up -d --build
+```
+
+The new provider and model are used on the next reply, including in existing threads. Shared context contains conversation text; it excludes internal tool results and reasoning.
+
+For older deployments, rename `CODEX_MODEL` to `ASSISTANT_MODEL` in `.env`. When running Node directly, `CODEX_MODEL` remains a Codex fallback, with `ASSISTANT_MODEL` taking precedence.
+
+## Configuration
+
+| Variable | Default | Purpose |
+| --- | --- | --- |
+| `GRYT_HOST` | Required by Compose | Gryt server address |
+| `GRYT_NICKNAME` | `AI Chat` | Bot name and mention text |
+| `ASSISTANT_PROVIDER` | `codex` | Provider to use for replies |
+| `ASSISTANT_MODEL` | Provider default | Model override |
+| `OPENAI_API_KEY` | Empty | Required for the OpenAI provider |
+| `OPENROUTER_API_KEY` | Empty | Required for the OpenRouter provider |
+| `HISTORY_CACHE_ENABLED` | `false` | Enable a local conversation cache |
+| `HISTORY_TTL_HOURS` | `168` | Cache lifetime in hours when enabled |
+
+Gryt fixes an identity's name when it is approved. Renaming an approved bot requires registering and approving a new identity in **Server settings → Bots**.
+
+## Conversation history and retention
+
+Gryt is the source of conversation history. With the default `HISTORY_CACHE_ENABLED=false`, the bot reads the thread root and previous replies from Gryt on every response, following pagination. It recognizes threads where it has already participated or been mentioned, including after a restart. Codex sessions are ephemeral and released after each response in this mode.
+
+Set `HISTORY_CACHE_ENABLED=true` to reduce reads from Gryt. The bot stores the cache in `/data/conversations.json`. `HISTORY_TTL_HOURS` defaults to 168 hours (7 days), measured from when the thread is loaded into the cache. New replies do not extend that deadline. Once the cache expires, the next message reloads the thread from Gryt. A lost provider session is recreated from the recovered text context.
+
+Cleanup runs at startup and at least once a minute. Expired cache records stop being used immediately. Old cache backups and legacy persistent Codex sessions, including archived sessions, are also subject to retention. Legacy cache records without an expiration are discarded; legacy Codex session retention is measured from creation.
+
+Disabling the cache removes local conversation cache files, backups, and legacy persistent Codex sessions. Bot identity and Codex authentication are preserved. Messages stored on the Gryt server remain available to rebuild context.
+
+The `/data/codex` directory is dedicated to this bot. Its retention policy applies to native Codex sessions stored there, so do not share it with another Codex installation.
+
+## Operations
+
+| Task | Command |
+| --- | --- |
+| Follow logs | `docker compose logs -f gryt-ai-chat-bot` |
+| Check container status | `docker compose ps` |
+| Restart the bot | `docker compose restart gryt-ai-chat-bot` |
+| Apply code or environment changes | `docker compose up -d --build` |
+| Stop the bot | `docker compose down` |
+
+Bot identity and Codex authentication live in the external Docker volume mounted at `/data` and survive container recreation. Preserve this volume when updating the bot.
+
+To disconnect the ChatGPT account, revoke the connection in ChatGPT settings and clear only the Codex authentication stored under `/data/codex`. Preserve `/data/ai-chat-bot-identity.json` to keep the approved Gryt identity.
+
+## Access and data handling
+
+The bot requests message read/send permissions and optional avatar upload permission. It does not provide Gryt administration commands. Server members who can reach the bot can trigger provider usage.
+
+Conversation text is sent to the selected provider. Codex uses the authenticated ChatGPT account; OpenAI and OpenRouter use their respective API keys and usage limits. The OpenRouter default is the `openrouter/free` route; selecting another model may incur charges.
+
+The bundled Codex configuration enables live web search. Its `gryt_chat` permission profile grants read access to `/tmp/gryt-ai-chat-bot` and disables network access through commands. The Compose service also grants `SYS_ADMIN` and disables the default seccomp and AppArmor profiles; review these settings for your deployment.
+
+Keep `.env`, API keys, bot identity, and Codex authentication out of Git, shared backups, and logs. The repository includes Git exclusions for common credential files and a Docker build context allowlist.
+
+## Development
+
+Use Node.js 22.13 or newer. Install dependencies and run the tests:
+
+```sh
+npm install
+npm test
+```
+
+The test suite runs without provider credentials. The Docker image includes the Codex CLI even when another provider is selected, because startup and periodic cleanup use it to remove legacy Codex sessions.
+
+Providers implement `start()`, `createSession({ model, instructions })`, `reply({ session, messages, signal })`, and `stop()`. The conversation service treats provider sessions as opaque values. The Codex adapter additionally releases ephemeral sessions and prunes legacy native history.
+
+## License
+
+[MIT](LICENSE)
