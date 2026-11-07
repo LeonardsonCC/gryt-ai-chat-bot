@@ -1,7 +1,12 @@
+name: gryt-ai-chat-bot
+
 services:
-  gryt-codex-bot:
-    build: .
-    container_name: gryt-codex-bot
+  gryt-ai-chat-bot:
+    build:
+      context: .
+      args:
+        ASSISTANT_PROVIDER: ${ASSISTANT_PROVIDER:-codex}
+    container_name: gryt-ai-chat-bot
     restart: unless-stopped
     security_opt:
       - seccomp:unconfined
@@ -10,12 +15,17 @@ services:
       - SYS_ADMIN
     environment:
       GRYT_HOST: ${GRYT_HOST:?set Gryt server host}
-      GRYT_NICKNAME: ${GRYT_NICKNAME:-Codex}
+      GRYT_NICKNAME: ${GRYT_NICKNAME:-AI Chat}
       CODEX_MODEL: ${CODEX_MODEL:-gpt-6-luna}
-      GRYT_IDENTITY_PATH: /data/gryt-bot-identity.json
+      ASSISTANT_PROVIDER: ${ASSISTANT_PROVIDER:-codex}
+      ASSISTANT_MODEL: ${ASSISTANT_MODEL:-}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      GRYT_IDENTITY_PATH: /data/ai-chat-bot-identity.json
       CODEX_HOME: /data/codex
     volumes:
-      - gryt-codex-data:/data
+      - gryt-ai-chat-bot-data:/data
 
 volumes:
-  gryt-codex-data:
+  gryt-ai-chat-bot-data:
+    external: true
+    name: gryt-ai-chat-bot_gryt-ai-chat-bot-data

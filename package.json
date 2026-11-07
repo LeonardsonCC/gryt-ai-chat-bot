@@ -1,9 +1,9 @@
 {
-  "name": "gryt-codex-bot",
+  "name": "gryt-ai-chat-bot",
   "version": "0.1.0",
   "private": true,
   "type": "module",
   "engines": { "node": ">=22.13" },
-  "scripts": { "start": "node src/index.js" },
+  "scripts": { "start": "node src/index.js", "test": "node test/conversation.test.js" },
   "dependencies": { "@gryt/bot": "^0.3.1" }
 }
