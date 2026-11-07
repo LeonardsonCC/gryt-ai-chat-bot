@@ -1,0 +1,22 @@
+# Only send the files required by Dockerfile to the builder.
+**
+!Dockerfile
+!package.json
+!avatar.png
+!config.toml
+!src/
+!src/**
+
+# Exclude credentials even if placed inside src/.
+**/.env
+**/.env.*
+**/.codex
+**/.aws
+**/auth.json
+**/*identity.json
+**/*.pem
+**/*.key
+**/*.p12
+**/*.pfx
+**/id_rsa
+**/id_ed25519
