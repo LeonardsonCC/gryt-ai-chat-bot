@@ -7,6 +7,10 @@ An AI conversation bot for Gryt with Codex, OpenAI, and OpenRouter support. Ment
 - Keep bot identity and authentication across container recreations.
 - Process messages in order within each conversation.
 
+## AI development disclaimer
+
+This project was developed with extensive use of AI tools for code, tests, and documentation. AI-assisted work can contain mistakes, security issues, or incorrect assumptions. Review the code and validate it for your environment before deploying, especially when handling credentials and conversation data.
+
 ## Requirements
 
 - A Gryt server where you can approve bots.
